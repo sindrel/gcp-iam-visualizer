@@ -1,18 +1,17 @@
 import logging
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-
-from cache_service import CRMProjects, CRMProjectIam, ServiceAccountService, \
+from oauth2client.client import GoogleCredentials
+from cache_service import CRMProjects, CRMProjectIam, CRMFolders, CRMFolderIam, ServiceAccountService, \
     ServiceAccountKeyService, BQDataset, BQDatasets, GCSBuckets, GCSBucketACL, \
     ServiceManagement
-
-from oauth2client.client import GoogleCredentials
-
 
 class GcpIamIterator:
     def __init__(self, use_cache=True):
         credentials = GoogleCredentials.get_application_default()
         google_crm_service = build('cloudresourcemanager', 'v1',
+                                   credentials=credentials)
+        google_crm_service_v2 = build('cloudresourcemanager', 'v2',
                                    credentials=credentials)
         google_iam_service = build('iam', 'v1', credentials=credentials)
         google_bq_service = build('bigquery', 'v2', credentials=credentials)
@@ -21,6 +20,8 @@ class GcpIamIterator:
                                           credentials=credentials)
         self.crm_service = CRMProjects(google_crm_service, use_cache)
         self.crm_iam_service = CRMProjectIam(google_crm_service, use_cache)
+        self.crm_folders_service = CRMFolders(google_crm_service_v2, use_cache)
+        self.crm_folders_iam_service = CRMFolderIam(google_crm_service_v2, use_cache)
         self.sa_service = ServiceAccountService(google_iam_service, use_cache)
         self.sak_service = ServiceAccountKeyService(google_iam_service,
                                                     use_cache)
@@ -34,15 +35,101 @@ class GcpIamIterator:
     def list_projects(self):
         response = self.crm_service.get()
 
+        projects = []
+
         while response:
             for project in response['projects']:
-                yield project
+                if len(projects) == 0:
+                    yield project
+                    continue
+
+                for requestedProject in projects:
+                    if project['projectId'] == requestedProject:
+                        yield project
 
             if 'nextPageToken' in response:
                 response = self.crm_service.get(
                     nextPageToken=response['nextPageToken'])
             else:
                 response = None
+
+    def list_folders(self, parent):
+        response = self.crm_folders_service.get(parent=parent)
+
+        while response:
+            for folder in response['folders']:
+                yield folder
+
+            if 'nextPageToken' in response:
+                response = self.crm_folders_service.get(
+                    nextPageToken=response['nextPageToken'])
+            else:
+                response = None
+
+    def list_nested_folders(self, folders_list, parent):
+        folders = []
+        folders_map = {}
+        folders_to_fetch = []
+
+        # Create a map of folders and nested folders
+        for folder in folders_list:
+            if folder['name'] not in folders_map:
+                folders_map[folder['name']] = []
+            if folder['parent'] not in folders_map:
+                folders_map[folder['parent']] = []
+
+            folders_map[folder['parent']].append(folder['name'])
+
+        children = [parent]
+
+        # Create a flat list of all desired folders
+        hasChildren = True
+        while hasChildren is True:
+            if not children:
+                hasChildren = False
+                break
+
+            parent = children[0]
+            folders_to_fetch.append(parent)
+
+            for child in folders_map[parent]:
+                children.append(child)
+                folders_to_fetch.append(child)
+
+            children.remove(parent)
+
+        folders_to_fetch = list(dict.fromkeys(folders_to_fetch))
+
+        for folder in folders_list:
+            if folder['name'] in folders_to_fetch:
+                folders.append(folder)
+
+        return folders
+
+    def list_folder_iam(self, folder_id):
+        try:
+            iam_policy = self.crm_folders_iam_service.get(folder_id=folder_id)
+        except HttpError as e:
+            if e.resp.status == 403:
+                logging.warning("403 received for folder_id: {0}, content: {1}"
+                                .format(folder_id, e.content))
+                return
+            else:
+                raise e
+
+        if 'bindings' in iam_policy:
+            for binding in iam_policy['bindings']:
+                yield binding
+
+    def list_projects_in_folders(self, all_projects, folders):
+        projects = []
+        for project in all_projects:
+            parent = project['parent']['type'] + "s/" + project['parent']['id']
+            for folder in folders:
+                if parent == folder['name']:
+                    projects.append(project)
+
+        return projects
 
     def list_project_iam(self, project_id):
         try:

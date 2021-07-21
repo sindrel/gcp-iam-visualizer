@@ -1,0 +1,491 @@
+<!doctype html>
+<html>
+<head>
+    <title>GCP IAM Graph</title>
+
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline';">
+
+    <style type="text/css">
+        html, body {
+            height: 100%;
+            overflow:hidden;
+        }
+        #visualization {
+            width: 100%;
+            height: 100%;
+            border: 0px solid lightgray;
+        }
+    </style>
+
+    <style>
+        .collapsible {
+            background-color: #f1f1f1;
+            color: black;
+            cursor: pointer;
+            padding: 10px;
+            width: 100%;
+            border: none;
+            text-align: left;
+            outline: none;
+            font-size: 12px;
+        }
+
+        .collapsible-container {
+            background-color: #f1f1f1;
+            position: -webkit-sticky; /* Safari */
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            padding-top: 10px;
+        }
+
+        .active, .collapsible:hover {
+            background-color: #d0cfcf;
+        }
+
+        .content {
+            padding: 0 10px;
+            display: none;
+            overflow: hidden;
+            background-color: #ffffff;
+        }
+    </style>
+
+    <link rel="stylesheet" href="src/assets/font-awesome/4.7.0/css/font-awesome.min.css">
+    <script type="text/javascript" src="src/assets/vis/4.16.1/vis.min.js"></script>
+    <link href="src/assets/vis/4.16.1/vis.min.css" rel="stylesheet" type="text/css" />
+
+    <script type="text/javascript">
+        var nodeTypes = {{ default_type_filters }};
+        var roleTypes = {{ all_roles_list }};
+
+        var labels = {{ labels }};
+        var projects = {{ projects }};
+        var users = {{ users }};
+        var groups = {{ groups }};
+        var serviceAccounts = {{ serviceAccounts }};
+
+        var data, nodeList, edgeList;
+
+        function draw() {
+
+            var container = document.getElementById('visualization');
+            nodeList = [{{ nodes_string }}];
+            edgeList = [{{ edges_string }}];
+            data = {
+                nodes: new vis.DataSet(nodeList),
+                edges: new vis.DataSet(edgeList)
+            };
+            var options = {
+                nodes: {
+                    shape: 'dot',
+                    scaling: {
+                        label: {
+                            min: 8,
+                            max: 20
+                        }
+                    }
+                },
+                edges: {
+                    length: 500,
+                    smooth: {
+                          enabled: true,
+                          type: "dynamic",
+                          roundness: 0.2
+                    }
+                },
+                physics: {
+                    forceAtlas2Based:{
+                        gravitationalConstant: -26,
+                        centralGravity: 0.0010,
+                        springConstant: 0.08,
+                        springLength: 100,
+                        avoidOverlap: 0.1,
+                        damping: 1
+                    },
+                    maxVelocity: 50,
+                    minVelocity: 2,
+                    solver: 'forceAtlas2Based',
+                    stabilization: true,
+                    adaptiveTimestep: true
+                },
+                layout: {
+                    randomSeed: 2
+                },
+                interaction: {
+                    hideEdgesOnDrag: false,
+                    hover: true,
+                    navigationButtons: false,
+                    keyboard: true,
+                    selectConnectedEdges: true,
+                    tooltipDelay: 0
+                }
+            };
+            filterNodes();
+            network = new vis.Network(container, data, options);
+        }
+
+        var filterNodes = function () {
+            nodeList.forEach(function (node) {
+                try {
+                    var index = nodeTypes.indexOf(node.type);
+                    var isRemoved = index == -1;
+                    if (isRemoved) {
+                        data.nodes.remove(node);
+                    }
+                } catch (err) {
+                    console.log(err);
+                }
+            });
+        };
+
+        var filterEdges = function () {
+            edgeList.forEach(function (edge) {
+                try {
+                    var index = roleTypes.indexOf(edge.type);
+                    var isRemoved = index == -1;
+                    if (isRemoved) {
+                        data.edges.remove(edge);
+                    }
+                } catch (err) {
+                    console.log(err);
+                }
+            });
+        };
+
+        var filterByType = function (type) {
+            startLoading();
+
+            var index = nodeTypes.indexOf(type);
+            var type_added = index == -1;
+            if (type_added) {
+                nodeTypes.push(type);
+            } else {
+                nodeTypes.splice(index, 1);
+            }
+
+            var the_nodes = nodeList.filter(function (item) {
+                return item.type == type;
+            });
+
+            the_nodes.forEach(function (node) {
+                try {
+                    if (type_added) {
+                        data.nodes.add(node);
+                    } else {
+                        data.nodes.remove(node);
+                    }
+                } catch (err) {
+                    console.log(err);
+                }
+            });
+
+            if (type_added) {
+                checkElements("checkbox_type_"+type)
+            } else {
+                uncheckElements("checkbox_type_"+type)
+            }
+
+            doneLoading();
+        };
+
+        var filterByLabel = function (label) {
+            startLoading();
+
+            var index = labels.indexOf(label);
+            var added = index == -1;
+
+            if (added) {
+                labels.push(label);
+            } else {
+                labels.splice(index, 1);
+            }
+
+            var the_nodes = nodeList.filter(function (item) {
+                return item.label == label;
+            });
+
+            the_nodes.forEach(function (node) {
+                try {
+                    if (added) {
+                        data.nodes.add(node);
+                    } else {
+                        data.nodes.remove(node);
+                    }
+                } catch (err) {
+                    console.log(err);
+                }
+            });
+
+            if (added) {
+                checkElements("checkbox_lbl_"+label)
+            } else {
+                uncheckElements("checkbox_lbl_"+label)
+            }
+
+            doneLoading();
+        };
+
+        var filterByRole = function (role) {
+            startLoading();
+
+            var index = roleTypes.indexOf(role);
+            var added = index == -1;
+            if (added) {
+                roleTypes.push(role);
+            } else {
+                roleTypes.splice(index, 1);
+            }
+
+            var the_edges = edgeList.filter(function (item) {
+                return item.role == role;
+            });
+
+            the_edges.forEach(function (edge) {
+                try {
+                    if (added) {
+                        data.edges.add(edge);
+                    } else {
+                        data.edges.remove(edge);
+                    }
+                } catch (err) {
+                    console.log(err);
+                }
+            });
+
+            if (added) {
+                checkElements("checkbox_lbl_"+role)
+            } else {
+                uncheckElements("checkbox_lbl_"+role)
+            }
+
+            doneLoading();
+        };
+
+        var deselectAllRoles = function () {
+            startLoading();
+
+            var roles = edgeList.filter(function (item) {
+                return item.type == "role";
+            });
+
+            roles.forEach(function (edge) {
+                try {
+                    data.edges.remove(edge);
+                } catch (err) {
+                    console.log(err);
+                }
+            });
+
+            uncheckElements("checkbox_type_role")
+
+            doneLoading();
+        };
+
+        function uncheckElements(name) {
+            var uncheck=document.getElementsByClassName(name);
+                for(var i=0;i<uncheck.length;i++)
+                {
+                    if(uncheck[i].type=='checkbox')
+                {
+                    uncheck[i].checked=false;
+                }
+            }
+        }
+
+        function checkElements(name) {
+            var check=document.getElementsByClassName(name);
+                for(var i=0;i<check.length;i++)
+                {
+                    if(check[i].type=='checkbox')
+                {
+                    check[i].checked=true;
+                }
+            }
+        }
+
+        function removeInactiveNodes() {
+            console.log("Removing inactive nodes...")
+
+            activeNodes = []
+            data.edges.forEach(function (edge) {
+                try {
+                    activeNodes.push(edge.from);
+                    activeNodes.push(edge.to);
+                } catch (err) {
+                    console.log(err);
+                }
+            });
+
+            data.nodes.forEach(function (node) {
+                try {
+                    if (!activeNodes.includes(node.id) && node.type != "project") {
+                        console.log("Removing inactive node " + node.id)
+                        data.nodes.remove(node);
+                    }
+                } catch (err) {
+                    console.log(err);
+                }
+            });
+        }
+
+        function removeInactiveEdges() {
+            console.log("Removing inactive edges...")
+
+            activeNodes = []
+
+            data.nodes.forEach(function (node) {
+                try {
+                    activeNodes.push(node.id);
+                } catch (err) {
+                    console.log(err);
+                }
+            });
+
+            console.log("Active nodes: " + activeNodes)
+
+            data.edges.forEach(function (edge) {
+                try {
+                    connected = false;
+                    // if (activeNodes.includes(edge.to)) {
+                    //     connected = true;
+                    // }
+
+                    if (activeNodes.includes(edge.from)) {
+                        console.log("Edge is connected to node "+ edge.from)
+                        console.log(edge)
+                        connected = true;
+                    }
+
+                    if (!connected) {
+                        console.log("Removing unconnected edge " + edge.id)
+                        data.edges.remove(edge);
+                    }
+
+                } catch (err) {
+                    console.log(err);
+                }
+            });
+        }
+
+        function runDebug() {
+            console.log("Doing the debug")
+
+            console.log("Dumping nodes...")
+            data.nodes.forEach(function (node) {
+                try {
+                    console.log(node);
+                } catch (err) {
+                    console.log(err);
+                }
+            });
+
+            console.log("Dumping edges...")
+            data.edges.forEach(function (edge) {
+                try {
+                    console.log(edge);
+                } catch (err) {
+                    console.log(err);
+                }
+            });
+        }
+
+        function startLoading() {
+            console.log("Loading...")
+        }
+
+        function doneLoading() {
+            console.log("Done loading.")
+        }
+    </script>
+</head>
+<body onload="draw()">
+
+<button type="button" class="collapsible collapsible-container"><i class="fa fa-bars" aria-hidden="true"></i> Filters</button>
+<div class="content">
+    <button type="button" class="collapsible">Types</button>
+    <div class="content">
+        <p>
+        {% for key, value in type_properties.items() %}
+            <input
+            {% if key in default_type_filters %}
+            checked="true"
+            {% endif %}
+            type="checkbox" onclick="filterByType('{{ key }}')">
+            {{ value['name'] }}</input>
+        {% endfor %}
+        </p>
+    </div>
+    <button type="button" class="collapsible">Projects</button>
+    <div class="content">
+        <p>
+        {% for label in projects %}
+            <input checked="true" type="checkbox" class="checkbox_type_project checkbox_lbl_{{ label }}" onclick="filterByLabel('{{ label }}')">{{ label }}</input>
+        {% endfor %}
+        </p>
+    </div>
+    <button type="button" class="collapsible">Users</button>
+    <div class="content">
+        <p>
+        {% for label in users %}
+            <input type="checkbox" class="checkbox_type_user checkbox_lbl_{{ label }}" onclick="filterByLabel('{{ label }}')">{{ label }}</input>
+        {% endfor %}
+        </p>
+    </div>
+    <button type="button" class="collapsible">Groups</button>
+    <div class="content">
+        <p>
+        {% for label in groups %}
+            <input type="checkbox" class="checkbox_type_group checkbox_lbl_{{ label }}" onclick="filterByLabel('{{ label }}')">{{ label }}</input>
+        {% endfor %}
+        </p>
+    </div>
+    <button type="button" class="collapsible">Service Accounts</button>
+    <div class="content">
+        <p>
+        {% for label in serviceAccounts %}
+            <input type="checkbox" class="checkbox_type_serviceAccount checkbox_lbl_{{ label }}" onclick="filterByLabel('{{ label }}')">{{ label }}</input>
+        {% endfor %}
+        </p>
+    </div>
+    <button type="button" class="collapsible">Roles</button>
+    <div class="content">
+        <p>
+        {% for key in all_roles_list %}
+            <input checked="true" type="checkbox" class="checkbox_type_role checkbox_lbl_{{ key }}" onclick="filterByRole('{{ key }}')">
+            <span style="color: {{all_roles[key]}}">{{ key }}</span></input>
+        {% endfor %}
+        <button type="button" onclick="deselectAllRoles()">Deselect all</button>
+        </p>
+    </div>
+    <button type="button" class="collapsible">Debug</button>
+    <div class="content">
+        <p>
+        <button type="button" onclick="runDebug()">Console Dump</button>
+        <button type="button" onclick="removeInactiveNodes()">Purge Inactive Nodes</button>
+        <button type="button" onclick="removeInactiveEdges()">Purge Inactive Edges</button>
+        </p>
+    </div>
+</div>
+
+<div id="visualization"></div>
+
+<script type="text/javascript">
+    var coll = document.getElementsByClassName("collapsible");
+    var i;
+
+    for (i = 0; i < coll.length; i++) {
+        coll[i].addEventListener("click", function() {
+            this.classList.toggle("active");
+            var content = this.nextElementSibling;
+            if (content.style.display === "block") {
+                content.style.display = "none";
+            } else {
+                content.style.display = "block";
+            }
+        });
+    }
+</script>
+
+</body>
+</html>

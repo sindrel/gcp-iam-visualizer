@@ -1,0 +1,3 @@
+google-api-python-client>=1.5.1
+oauth2client>=4.1.3
+Jinja2>=3.0.1

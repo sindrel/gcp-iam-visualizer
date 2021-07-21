@@ -1,24 +1,47 @@
 type_properties = {
     'project': {
-        'name': 'GCP Project',
-        'font_code': '\uf1ad',
+        'name': 'Project',
+        'font_code': '\uf0e8', # \uf1ad
         'size': 70,
-        'color': '#000066'
+        'color': '#F65314',
+        'default': False
+    },
+    'folder': {
+        'name': 'Folder',
+        'font_code': '\uf07c',
+        'size': 60,
+        'color': '#EA4335',
+        'default': True
     },
     'serviceAccount': {
         'name': 'Service Account',
         'font_code': '\uf084',
         'size': 50,
-        'color': '#000066'
+        'color': '#00A1F1',
+        'default': False
+    },
+    'user': {
+        'name': 'User',
+        'font_code': '\uf007',
+        'size': 50,
+        'color': '#4285F4',
+        'default': False
+    },
+    'group': {
+        'name': 'Group',
+        'font_code': '\uf0c0',
+        'size': 50,
+        'color': '#00A1F1',
+        'default': False
     },
     'unknown': {
         'name': 'Unknown',
         'font_code': '\uf128',
         'size': 50,
-        'color': '#FF0000'
+        'color': '#FF0000',
+        'default': False
     }
 }
-
 
 class Node:
     def __init__(self, node_type, id, name, title=None, color_group=None,
@@ -31,6 +54,9 @@ class Node:
         self.title = title
         self.color_group = color_group
         self.properties = properties
+
+        if self.node_type not in type_properties:
+            self.node_type = "unknown"
 
     def get_color(self):
         if self.color_group:
@@ -57,7 +83,6 @@ class Node:
 
     def __unicode__(self):
         return unicode(self.__str__())
-
 
 class Edge:
     def __init__(self, node_from, node_to, label=None, title=None, role=None):

@@ -1,7 +1,6 @@
 import os.path
 import json
 
-
 class JsonCacheService(object):
     def __init__(self, service, use_cache):
         self.service = service
@@ -28,7 +27,6 @@ class JsonCacheService(object):
     def _get_data(self, **kwargs):
         raise NotImplementedError()
 
-
 class CRMProjects(JsonCacheService):
     def _get_filename(self, **kwargs):
         return "cache/projects/projects_{0}.json".format(
@@ -39,6 +37,27 @@ class CRMProjects(JsonCacheService):
             pageSize=400,
             pageToken=kwargs.get('nextPageToken', None)).execute()
 
+class CRMFolders(JsonCacheService):
+    def _get_filename(self, **kwargs):
+        return "cache/folders/folders_{0}.json".format(
+            kwargs.get('nextPageToken', ''))
+
+    # def _get_data(self, **kwargs):
+    #     return self.service.folders().list(
+    #         parent=kwargs.get('parent', ''),
+    #         pageSize=400,
+    #         pageToken=kwargs.get('nextPageToken', None)).execute()
+
+    def _get_data(self, **kwargs):
+        return self.service.folders().search(body={}).execute()
+
+class CRMFolderIam(JsonCacheService):
+    def _get_filename(self, **kwargs):
+        return "cache/%s/iam.json" % (kwargs['folder_id'])
+
+    def _get_data(self, **kwargs):
+        return self.service.folders().getIamPolicy(
+            resource=kwargs['folder_id'], body={}).execute()
 
 class CRMProjectIam(JsonCacheService):
     def _get_filename(self, **kwargs):
@@ -47,7 +66,6 @@ class CRMProjectIam(JsonCacheService):
     def _get_data(self, **kwargs):
         return self.service.projects().getIamPolicy(
             resource=kwargs['project_id'], body={}).execute()
-
 
 class ServiceAccountService(JsonCacheService):
     def _get_filename(self, **kwargs):
@@ -59,7 +77,6 @@ class ServiceAccountService(JsonCacheService):
             name='projects/' + kwargs['project_id'],
             pageToken=kwargs.get('nextPageToken', None)).execute()
 
-
 class ServiceAccountKeyService(JsonCacheService):
     def _get_filename(self, **kwargs):
         return "cache/serviceAccountsKeys/{0}.json".format(kwargs['email'])
@@ -68,7 +85,6 @@ class ServiceAccountKeyService(JsonCacheService):
         return self.service.projects().serviceAccounts().keys().list(
             name='projects/-/serviceAccounts/' + kwargs['email'],
             keyTypes='USER_MANAGED').execute()
-
 
 class GCSBuckets(JsonCacheService):
     def _get_filename(self, **kwargs):
@@ -80,7 +96,6 @@ class GCSBuckets(JsonCacheService):
             project=kwargs['project_id'],
             pageToken=kwargs.get('pageToken', '')).execute()
 
-
 class GCSBucketACL(JsonCacheService):
     def _get_filename(self, **kwargs):
         return "cache/buckets/gcs_acl_{0}.json".format(kwargs['bucket_id'])
@@ -88,7 +103,6 @@ class GCSBucketACL(JsonCacheService):
     def _get_data(self, **kwargs):
         return self.service.bucketAccessControls().list(
             bucket=kwargs['bucket_id']).execute()
-
 
 class BQDataset(JsonCacheService):
     def _get_filename(self, **kwargs):
@@ -100,7 +114,6 @@ class BQDataset(JsonCacheService):
                                            datasetId=kwargs[
                                                'dataset_id']).execute()
 
-
 class BQDatasets(JsonCacheService):
     def _get_filename(self, **kwargs):
         return "cache/{0}/datasets_{1}.json" \
@@ -110,7 +123,6 @@ class BQDatasets(JsonCacheService):
         return self.service.datasets().list(
             projectId=kwargs['project_id'],
             pageToken=kwargs.get('pageToken', '')).execute()
-
 
 class ServiceManagement(JsonCacheService):
     def _get_filename(self, **kwargs):
