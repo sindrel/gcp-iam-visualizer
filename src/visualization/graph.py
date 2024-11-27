@@ -20,6 +20,13 @@ type_properties = {
         'color': '#00A1F1',
         'default': False
     },
+    'defaultServiceAccount': {
+        'name': 'Default Service Account',
+        'font_code': '\uf084',
+        'size': 50,
+        'color': '#00A1F1',
+        'default': False
+    },
     'user': {
         'name': 'User',
         'font_code': '\uf007',

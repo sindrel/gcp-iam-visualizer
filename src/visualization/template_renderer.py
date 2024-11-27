@@ -14,6 +14,7 @@ def create_html(nodes_string, edges_string, role_color_map, output_name, nodes):
     users = []
     groups = []
     serviceAccounts = []
+    defaultServiceAccounts = []
 
     for type in graph.type_properties:
         if graph.type_properties[type]['default']:
@@ -30,6 +31,8 @@ def create_html(nodes_string, edges_string, role_color_map, output_name, nodes):
             groups.append(node.name)
         if node.node_type == "serviceAccount":
             serviceAccounts.append(node.name)
+        if node.node_type == "defaultServiceAccount":
+            defaultServiceAccounts.append(node.name)
 
     html = template.render(nodes_string=nodes_string,
                            edges_string=edges_string,
@@ -40,6 +43,7 @@ def create_html(nodes_string, edges_string, role_color_map, output_name, nodes):
                            users=sorted(users),
                            groups=sorted(groups),
                            serviceAccounts=sorted(serviceAccounts),
+                           defaultServiceAccounts=sorted(defaultServiceAccounts),
                            all_roles_list=sorted(list(role_color_map.keys())),
                            all_roles=role_color_map)
     with open(output_name, "w+") as resource_file:
@@ -96,15 +100,24 @@ def format_graph(nodes, edges, role_color_map):
     node_ids = {}
 
     for counter, node in enumerate(nodes):
-        #print("node name: " + node.name)
-        #print("node node_type: " + node.node_type)
+        # print("node name: " + node.name)
+        # print("node node_type: " + node.node_type)
+
+        node_type = node.node_type
+        if node.node_type == "serviceAccount":
+            if node.name.startswith("service-"):
+                node_type = "defaultServiceAccount"
+            elif "@firebase" in node.name:
+                node_type = "defaultServiceAccount"
+            elif not node.name.endswith("iam.gserviceaccount.com"):
+                node_type = "defaultServiceAccount"
 
         node_ids[node.id] = counter
         value = {
             'id': counter,
             'shape': 'icon',
             'label': node.name,
-            'type': node.node_type,
+            'type': node_type,
             'icon': {
                 'face': 'FontAwesome',
                 'code': node.get_font_code(),
@@ -136,3 +149,4 @@ def format_graph(nodes, edges, role_color_map):
         edges_string.append(json.dumps(value))
 
     return nodes_string, edges_string
+

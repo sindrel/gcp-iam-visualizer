@@ -58,17 +58,16 @@
     <script type="text/javascript">
         var nodeTypes = {{ default_type_filters }};
         var roleTypes = {{ all_roles_list }};
-
         var labels = {{ labels }};
         var projects = {{ projects }};
         var users = {{ users }};
         var groups = {{ groups }};
         var serviceAccounts = {{ serviceAccounts }};
+        var defaultServiceAccounts = {{ defaultServiceAccounts }};
 
         var data, nodeList, edgeList;
 
         function draw() {
-
             var container = document.getElementById('visualization');
             nodeList = [{{ nodes_string }}];
             edgeList = [{{ edges_string }}];
@@ -181,9 +180,19 @@
             });
 
             if (type_added) {
-                checkElements("checkbox_type_"+type)
+                checkElements("checkbox_type_" + type);
+                if (type === "defaultServiceAccount") {
+                    the_nodes.forEach(function (node) {
+                        checkElements("checkbox_lbl_" + node.label);
+                    });
+                }
             } else {
-                uncheckElements("checkbox_type_"+type)
+                uncheckElements("checkbox_type_" + type);
+                if (type === "defaultServiceAccount") {
+                    the_nodes.forEach(function (node) {
+                        uncheckElements("checkbox_lbl_" + node.label);
+                    });
+                }
             }
 
             doneLoading();
@@ -258,26 +267,6 @@
             } else {
                 uncheckElements("checkbox_lbl_"+role)
             }
-
-            doneLoading();
-        };
-
-        var deselectAllRoles = function () {
-            startLoading();
-
-            var roles = edgeList.filter(function (item) {
-                return item.type == "role";
-            });
-
-            roles.forEach(function (edge) {
-                try {
-                    data.edges.remove(edge);
-                } catch (err) {
-                    console.log(err);
-                }
-            });
-
-            uncheckElements("checkbox_type_role")
 
             doneLoading();
         };
@@ -397,6 +386,26 @@
         function doneLoading() {
             console.log("Done loading.")
         }
+
+        var deselectAllRoles = function () {
+            startLoading();
+
+            var roles = edgeList.filter(function (item) {
+                return item.type == "role";
+            });
+
+            roles.forEach(function (edge) {
+                try {
+                    data.edges.remove(edge);
+                } catch (err) {
+                    console.log(err);
+                }
+            });
+
+            uncheckElements("checkbox_type_role")
+
+            doneLoading();
+        };
     </script>
 </head>
 <body onload="draw()">
