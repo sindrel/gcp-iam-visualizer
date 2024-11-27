@@ -1,14 +1,14 @@
 import logging
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from oauth2client.client import GoogleCredentials
+from google.auth import default
 from cache_service import CRMProjects, CRMProjectIam, CRMFolders, CRMFolderIam, ServiceAccountService, \
     ServiceAccountKeyService, BQDataset, BQDatasets, GCSBuckets, GCSBucketACL, \
     ServiceManagement
 
 class GcpIamIterator:
     def __init__(self, use_cache=True):
-        credentials = GoogleCredentials.get_application_default()
+        credentials, project = default()
         google_crm_service = build('cloudresourcemanager', 'v1',
                                    credentials=credentials)
         google_crm_service_v2 = build('cloudresourcemanager', 'v2',
